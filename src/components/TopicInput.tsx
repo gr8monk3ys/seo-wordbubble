@@ -1,21 +1,21 @@
-import { useState } from 'react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { useState } from 'react'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 interface TopicInputProps {
-  onAnalyze: (topic: string) => void;
-  loading: boolean;
+  onAnalyze: (topic: string) => void
+  loading: boolean
 }
 
 export default function TopicInput({ onAnalyze, loading }: TopicInputProps) {
-  const [topic, setTopic] = useState('');
+  const [topic, setTopic] = useState('')
 
   const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault()
     if (topic.trim() && !loading) {
-      onAnalyze(topic.trim());
+      onAnalyze(topic.trim())
     }
-  };
+  }
 
   return (
     <div className="input-container">
@@ -24,7 +24,11 @@ export default function TopicInput({ onAnalyze, loading }: TopicInputProps) {
           SEO Word Bubble Generator
         </h2>
         <div className="space-y-4">
+          <label htmlFor="topic-input" className="sr-only">
+            Enter your topic
+          </label>
           <Input
+            id="topic-input"
             type="text"
             value={topic}
             onChange={(e) => setTopic(e.target.value)}
@@ -42,5 +46,5 @@ export default function TopicInput({ onAnalyze, loading }: TopicInputProps) {
         </div>
       </form>
     </div>
-  );
+  )
 }
