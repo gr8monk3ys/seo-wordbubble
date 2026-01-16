@@ -13,28 +13,38 @@ npm run start    # Start production server
 
 ## Architecture
 
-This is a Next.js 14 app (App Router) that generates SEO keyword visualizations using OpenAI and D3.js.
+Next.js 14 app (App Router) that generates SEO keyword visualizations using OpenAI and D3.js.
 
 ### Data Flow
-1. User enters a topic in `TopicInput` component
-2. `page.tsx` sends POST request to `/api/analyze` with the topic
-3. API route calls OpenAI (gpt-3.5-turbo) to generate SEO keywords with relevance scores
-4. Response is parsed into `{ text, size }[]` format
-5. `WordBubble` component renders D3.js force-directed bubble visualization
+
+1. User enters topic in `TopicInput` → `page.tsx` POSTs to `/api/analyze`
+2. API calls OpenAI (gpt-3.5-turbo) with SEO expert system prompt
+3. Response parsed via regex into `{ text: string, size: number }[]` (size = score × 10)
+4. `WordBubble` renders D3.js force-directed bubble visualization
 
 ### Key Files
-- `src/app/api/analyze/route.ts` - OpenAI integration, keyword parsing logic
-- `src/components/WordBubble.tsx` - D3.js force simulation with neumorphic styling
-- `src/components/TopicInput.tsx` - Form component for topic input
-- `src/components/ui/` - Reusable UI primitives (Button, Input)
+
+- `src/app/api/analyze/route.ts` - OpenAI integration, keyword parsing with fallback
+- `src/components/WordBubble.tsx` - D3.js force simulation with neumorphic SVG filters
+- `src/components/TopicInput.tsx` - Form with loading state
+- `src/lib/utils.ts` - `cn()` utility (clsx + tailwind-merge)
+
+### D3 Visualization Details
+
+- Force simulation with charge, center, and collision forces
+- Size scaling based on keyword scores (min 20px, max container/8)
+- Neumorphic effect via SVG filter (blur, offset, specular lighting)
+- ResizeObserver for responsive updates
+- Hover animations on bubbles
 
 ### Environment
-Requires `OPENAI_API_KEY` in `.env.local` (see `.env.example`)
+
+Requires `OPENAI_API_KEY` in `.env.local`
 
 ## Code Style
 
-- TypeScript strict mode enabled
-- Path alias: `@/*` maps to `./src/*`
-- 2-space indentation, single quotes, no semicolons
-- Named exports for components (props interface required)
-- API responses: `{ error: string }` for errors, data array for success
+- TypeScript strict mode, no `any`
+- Path alias: `@/*` → `./src/*`
+- 2-space indent, single quotes, no semicolons
+- Named exports for components with props interface
+- API errors: `{ error: string }`, success: data array directly
