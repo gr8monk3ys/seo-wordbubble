@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 
 interface ExportButtonsProps {
   svgRef: React.RefObject<SVGSVGElement | null>
