@@ -1,7 +1,21 @@
 import { NextResponse } from 'next/server'
 import OpenAI from 'openai'
+import { z } from 'zod'
+import { zodResponseFormat } from 'openai/helpers/zod'
+import { SearchIntentSchema, DifficultySchema, type KeywordData } from '@/types/keywords'
+import { rateLimit, getClientIdentifier } from '@/lib/rate-limit'
 
 const MAX_TOPIC_LENGTH = 500
+
+const OpenAIKeywordSchema = z.object({
+  keywords: z.array(z.object({
+    text: z.string().describe('The SEO keyword or phrase'),
+    relevanceScore: z.number().min(1).max(100).describe('Relevance score based on search volume and topic relevance'),
+    searchIntent: SearchIntentSchema.describe('The user intent behind the search'),
+    difficulty: DifficultySchema.describe('SEO competition level'),
+    variations: z.array(z.string()).max(3).describe('2-3 long-tail keyword variations')
+  }))
+})
 
 function getOpenAIClient(): OpenAI | null {
   const apiKey = process.env.OPENAI_API_KEY
@@ -11,7 +25,24 @@ function getOpenAIClient(): OpenAI | null {
   return new OpenAI({ apiKey })
 }
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<NextResponse<KeywordData[] | { error: string }>> {
+  // Rate limiting: 10 requests per minute per IP
+  const clientId = getClientIdentifier(request)
+  const rateLimitResult = rateLimit(clientId, { maxRequests: 10, windowMs: 60000 })
+
+  if (!rateLimitResult.success) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please try again later.' },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(Math.ceil(rateLimitResult.resetIn / 1000)),
+          'X-RateLimit-Remaining': '0'
+        }
+      }
+    )
+  }
+
   const openai = getOpenAIClient()
   if (!openai) {
     return NextResponse.json(
@@ -46,35 +77,44 @@ export async function POST(request: Request) {
       )
     }
 
-    const completion = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
+    const completion = await openai.beta.chat.completions.parse({
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
-          content: 'You are an SEO expert. Analyze the given topic and return the most relevant keywords for SEO optimization. For each keyword, provide an importance score between 1 and 100 based on relevance, search volume, and competition. Format each keyword as: keyword (score)'
+          content: `You are an SEO expert. For the given topic, generate 10-15 highly relevant keywords.
+For each keyword provide:
+- relevanceScore (1-100): based on search volume and topic relevance
+- searchIntent: the user's intent (informational/navigational/transactional/commercial)
+- difficulty: SEO competition level (low/medium/high)
+- variations: 2-3 long-tail keyword variations
+
+Focus on a mix of search intents and difficulty levels to provide comprehensive SEO coverage.`
         },
         {
           role: 'user',
           content: `Generate SEO keywords for the topic: ${sanitizedTopic}`
         }
-      ]
+      ],
+      response_format: zodResponseFormat(OpenAIKeywordSchema, 'seo_keywords')
     })
 
-    const response = completion.choices[0]?.message?.content
-    if (!response) {
+    const parsed = completion.choices[0]?.message?.parsed
+    if (!parsed || !parsed.keywords || parsed.keywords.length === 0) {
       return NextResponse.json(
-        { error: 'No response from AI model' },
+        { error: 'No keywords generated from AI model' },
         { status: 500 }
       )
     }
 
-    const keywords = parseKeywords(response)
-    if (keywords.length === 0) {
-      return NextResponse.json(
-        { error: 'Failed to parse keywords from response' },
-        { status: 500 }
-      )
-    }
+    const keywords: KeywordData[] = parsed.keywords.map(k => ({
+      text: k.text,
+      size: k.relevanceScore * 10,
+      relevanceScore: k.relevanceScore,
+      searchIntent: k.searchIntent,
+      difficulty: k.difficulty,
+      variations: k.variations
+    }))
 
     return NextResponse.json(keywords)
   } catch (error) {
@@ -84,31 +124,4 @@ export async function POST(request: Request) {
       { status: 500 }
     )
   }
-}
-
-function parseKeywords(response: string): Array<{ text: string; size: number }> {
-  const keywordRegex = /([^(\n]+)\s*\((\d+)\)/g
-  const keywords: Array<{ text: string; size: number }> = []
-  let match
-
-  while ((match = keywordRegex.exec(response)) !== null) {
-    const text = match[1].trim()
-    const score = parseInt(match[2], 10)
-    if (text && !isNaN(score) && score >= 1 && score <= 100) {
-      keywords.push({
-        text,
-        size: score * 10
-      })
-    }
-  }
-
-  if (keywords.length === 0) {
-    const lines = response.split('\n').filter(line => line.trim())
-    return lines.slice(0, 20).map((keyword, index) => ({
-      text: keyword.replace(/^\d+\.\s*/, '').trim(),
-      size: 1000 / (index + 1)
-    }))
-  }
-
-  return keywords
 }
