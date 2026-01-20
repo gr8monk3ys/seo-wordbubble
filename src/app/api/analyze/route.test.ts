@@ -1,13 +1,37 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { POST } from './route'
 
-// Mock OpenAI
+// Mock OpenAI with structured outputs (beta.chat.completions.parse)
 vi.mock('openai', () => {
-  const mockCreate = vi.fn().mockResolvedValue({
+  const mockParse = vi.fn().mockResolvedValue({
     choices: [
       {
         message: {
-          content: 'SEO (90)\nKeyword Research (85)\nContent Marketing (75)',
+          parsed: {
+            keywords: [
+              {
+                text: 'SEO optimization',
+                relevanceScore: 90,
+                searchIntent: 'informational',
+                difficulty: 'medium',
+                variations: ['seo tips', 'search engine optimization guide'],
+              },
+              {
+                text: 'keyword research',
+                relevanceScore: 85,
+                searchIntent: 'informational',
+                difficulty: 'low',
+                variations: ['keyword analysis', 'finding keywords'],
+              },
+              {
+                text: 'content marketing',
+                relevanceScore: 75,
+                searchIntent: 'commercial',
+                difficulty: 'high',
+                variations: ['content strategy', 'marketing content'],
+              },
+            ],
+          },
         },
       },
     ],
@@ -15,14 +39,21 @@ vi.mock('openai', () => {
 
   return {
     default: class MockOpenAI {
-      chat = {
-        completions: {
-          create: mockCreate,
+      beta = {
+        chat: {
+          completions: {
+            parse: mockParse,
+          },
         },
       }
     },
   }
 })
+
+// Mock zodResponseFormat
+vi.mock('openai/helpers/zod', () => ({
+  zodResponseFormat: vi.fn().mockReturnValue({ type: 'json_schema' }),
+}))
 
 describe('POST /api/analyze', () => {
   beforeEach(() => {
@@ -41,9 +72,14 @@ describe('POST /api/analyze', () => {
 
     expect(response.status).toBe(200)
     expect(Array.isArray(data)).toBe(true)
-    expect(data.length).toBeGreaterThan(0)
+    expect(data.length).toBe(3)
     expect(data[0]).toHaveProperty('text')
     expect(data[0]).toHaveProperty('size')
+    expect(data[0]).toHaveProperty('relevanceScore')
+    expect(data[0]).toHaveProperty('searchIntent')
+    expect(data[0]).toHaveProperty('difficulty')
+    expect(data[0]).toHaveProperty('variations')
+    expect(data[0].size).toBe(900) // relevanceScore * 10
   })
 
   it('should return 400 for missing topic', async () => {
