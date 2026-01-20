@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 
 interface RateLimitConfig {
   maxRequests: number
@@ -20,6 +20,16 @@ export function useRateLimit({
   const [remainingRequests, setRemainingRequests] = useState(maxRequests)
   const [resetTime, setResetTime] = useState<number | null>(null)
   const requestTimestamps = useRef<number[]>([])
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+    }
+  }, [])
 
   const checkRateLimit = useCallback((): boolean => {
     const now = Date.now()
@@ -40,12 +50,18 @@ export function useRateLimit({
       setIsRateLimited(true)
       setRemainingRequests(0)
 
+      // Clear any existing timeout before setting a new one
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current)
+      }
+
       // Schedule reset
       const timeUntilReset = resetAt - now
-      setTimeout(() => {
+      timeoutRef.current = setTimeout(() => {
         setIsRateLimited(false)
         setResetTime(null)
         setRemainingRequests(maxRequests - requestTimestamps.current.length + 1)
+        timeoutRef.current = null
       }, timeUntilReset)
 
       return false
