@@ -85,21 +85,21 @@ describe('rateLimit', () => {
 })
 
 describe('getClientIdentifier', () => {
-  it('should extract IP from x-forwarded-for header', () => {
+  it('should extract valid IPv4 from x-forwarded-for header', () => {
     const request = new Request('https://example.com', {
       headers: {
-        'x-forwarded-for': '192.168.1.1, 10.0.0.1'
-      }
+        'x-forwarded-for': '192.168.1.1, 10.0.0.1',
+      },
     })
 
     expect(getClientIdentifier(request)).toBe('192.168.1.1')
   })
 
-  it('should extract IP from x-real-ip header when x-forwarded-for is missing', () => {
+  it('should extract valid IPv4 from x-real-ip header when x-forwarded-for is missing', () => {
     const request = new Request('https://example.com', {
       headers: {
-        'x-real-ip': '192.168.1.2'
-      }
+        'x-real-ip': '192.168.1.2',
+      },
     })
 
     expect(getClientIdentifier(request)).toBe('192.168.1.2')
@@ -114,10 +114,61 @@ describe('getClientIdentifier', () => {
   it('should trim whitespace from IP addresses', () => {
     const request = new Request('https://example.com', {
       headers: {
-        'x-forwarded-for': '  192.168.1.3  , 10.0.0.1'
-      }
+        'x-forwarded-for': '  192.168.1.3  , 10.0.0.1',
+      },
     })
 
     expect(getClientIdentifier(request)).toBe('192.168.1.3')
+  })
+
+  it('should reject invalid/spoofed IP addresses and return anonymous', () => {
+    const request = new Request('https://example.com', {
+      headers: {
+        'x-forwarded-for': 'malicious-script, 10.0.0.1',
+      },
+    })
+
+    expect(getClientIdentifier(request)).toBe('anonymous')
+  })
+
+  it('should reject IP addresses with injection attempts', () => {
+    const request = new Request('https://example.com', {
+      headers: {
+        'x-forwarded-for': '192.168.1.1; DROP TABLE users;',
+      },
+    })
+
+    expect(getClientIdentifier(request)).toBe('anonymous')
+  })
+
+  it('should accept valid IPv6 addresses', () => {
+    const request = new Request('https://example.com', {
+      headers: {
+        'x-forwarded-for': '2001:0db8:85a3:0000:0000:8a2e:0370:7334',
+      },
+    })
+
+    expect(getClientIdentifier(request)).toBe('2001:0db8:85a3:0000:0000:8a2e:0370:7334')
+  })
+
+  it('should reject malformed IPv4 addresses', () => {
+    const request = new Request('https://example.com', {
+      headers: {
+        'x-forwarded-for': '999.999.999.999',
+      },
+    })
+
+    expect(getClientIdentifier(request)).toBe('anonymous')
+  })
+
+  it('should fallback to x-real-ip if x-forwarded-for is invalid', () => {
+    const request = new Request('https://example.com', {
+      headers: {
+        'x-forwarded-for': 'invalid-ip',
+        'x-real-ip': '10.0.0.5',
+      },
+    })
+
+    expect(getClientIdentifier(request)).toBe('10.0.0.5')
   })
 })
