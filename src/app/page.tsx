@@ -10,7 +10,7 @@ import { useRateLimit } from '@/hooks/useRateLimit'
 import { useState, useRef } from 'react'
 import { KeywordDataArraySchema, type KeywordData } from '@/types/keywords'
 
-export default function Home(): JSX.Element {
+export default function Home() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [bubbleData, setBubbleData] = useState<KeywordData[]>([])

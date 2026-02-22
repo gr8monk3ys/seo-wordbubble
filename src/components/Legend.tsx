@@ -5,11 +5,11 @@ interface LegendProps {
   className?: string
 }
 
-export function Legend({ className = '' }: LegendProps): JSX.Element {
+export function Legend({ className = '' }: LegendProps) {
   return (
     <div className={`flex flex-wrap gap-4 justify-center ${className}`}>
       <div className="text-sm font-medium text-gray-600 mr-2">Search Intent:</div>
-      {(Object.keys(INTENT_COLORS) as SearchIntent[]).map(intent => (
+      {(Object.keys(INTENT_COLORS) as SearchIntent[]).map((intent) => (
         <div key={intent} className="flex items-center gap-2">
           <div
             className="w-4 h-4 rounded-full"
