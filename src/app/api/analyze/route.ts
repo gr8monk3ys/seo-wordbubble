@@ -80,7 +80,14 @@ export async function POST(
     const validated = AnalyzeRequestSchema.safeParse(body)
 
     if (!validated.success) {
-      const errorMessage = validated.error.errors[0]?.message || 'Invalid request'
+      const firstIssue = validated.error.issues[0]
+      const isTopicMissing =
+        firstIssue?.code === 'invalid_type' &&
+        firstIssue?.path[0] === 'topic' &&
+        !Object.prototype.hasOwnProperty.call(body, 'topic')
+      const errorMessage = isTopicMissing
+        ? 'Topic is required'
+        : firstIssue?.message || 'Invalid request'
       return NextResponse.json({ error: errorMessage }, { status: 400, headers: rateLimitHeaders })
     }
 
