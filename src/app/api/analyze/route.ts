@@ -10,11 +10,8 @@ const MAX_TOPIC_LENGTH = 500
 // Request body validation schema
 const AnalyzeRequestSchema = z.object({
   topic: z
-    .string({
-      required_error: 'Topic is required',
-      invalid_type_error: 'Topic must be a string',
-    })
-    .min(1, 'Topic cannot be empty')
+    .string()
+    .min(1, 'Topic is required')
     .max(MAX_TOPIC_LENGTH, `Topic must be ${MAX_TOPIC_LENGTH} characters or less`)
     .transform((val) => val.trim())
     .refine((val) => val.length > 0, 'Topic cannot be empty'),
