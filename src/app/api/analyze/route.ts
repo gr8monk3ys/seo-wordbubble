@@ -90,7 +90,7 @@ export async function POST(
 
     const { topic: sanitizedTopic } = validated.data
 
-    const completion = await openai.beta.chat.completions.parse({
+    const completion = await openai.chat.completions.parse({
       model: 'gpt-4o-mini',
       messages: [
         {
